@@ -1,0 +1,18 @@
+services:
+  fetch-relay:
+    image: node:20-alpine
+    container_name: fetch-relay
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "server.mjs"]
+    env_file: .env
+    volumes:
+      - ./server.mjs:/app/server.mjs:ro
+    networks:
+      - fetch-relay-net
+
+networks:
+  fetch-relay-net:
+    name: ${DOCKER_NETWORK:-fetch-relay-net}
+    external: true
+
