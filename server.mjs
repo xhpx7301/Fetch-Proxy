@@ -65,7 +65,12 @@ const server = http.createServer(async (request, response) => {
     }
 
     const target = parseAllowedTarget(incoming.searchParams.get('url') || '');
-    const upstream = await fetchTarget(target, incoming.searchParams.get('ua'));
+    const requestUserAgent = Array.isArray(request.headers['user-agent'])
+      ? request.headers['user-agent'][0]
+      : request.headers['user-agent'];
+    // MiSub uses a dedicated UA for quota requests. Preserve it so providers
+    // that vary subscription headers by client return the same data as direct fetches.
+    const upstream = await fetchTarget(target, requestUserAgent || incoming.searchParams.get('ua'));
     const declaredLength = Number(upstream.headers.get('content-length') || 0);
     if (declaredLength > maxResponseBytes) return sendJson(response, 413, 'Response is too large');
 
@@ -95,4 +100,3 @@ const server = http.createServer(async (request, response) => {
 server.listen(port, () => {
   console.log(`Fetch relay listening on port ${port}; allowed hosts: ${allowedHosts.size}`);
 });
-
