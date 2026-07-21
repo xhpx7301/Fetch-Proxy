@@ -87,6 +87,7 @@ install -d -m 700 "${INSTALL_DIR}"
 install -m 644 "${SCRIPT_DIR}/server.mjs" "${INSTALL_DIR}/server.mjs"
 install -m 644 "${SCRIPT_DIR}/docker-compose.yml" "${INSTALL_DIR}/docker-compose.yml"
 install -m 755 "${SCRIPT_DIR}/manage.sh" "${INSTALL_DIR}/manage.sh"
+install -m 755 "${SCRIPT_DIR}/uninstall.sh" "${INSTALL_DIR}/uninstall.sh"
 install -m 755 "${SCRIPT_DIR}/fetch" "/usr/local/bin/fetch"
 
 cat > "${INSTALL_DIR}/.env" <<EOF
@@ -94,18 +95,34 @@ ALLOWED_HOSTS=${ALLOWED_HOSTS}
 RELAY_SECRET=${RELAY_SECRET}
 DOCKER_NETWORK=${NETWORK_NAME}
 RELAY_DOMAIN=${RELAY_DOMAIN}
+SOURCE_DIR=${SCRIPT_DIR}
 EOF
 chmod 600 "${INSTALL_DIR}/.env"
 
+NETWORK_CREATED=0
+NPM_CONNECTED=0
+
 if ! docker network inspect "${NETWORK_NAME}" >/dev/null 2>&1; then
   docker network create "${NETWORK_NAME}" >/dev/null
+  NETWORK_CREATED=1
 fi
 
 if docker container inspect "${NPM_CONTAINER}" >/dev/null 2>&1; then
-  docker network connect "${NETWORK_NAME}" "${NPM_CONTAINER}" 2>/dev/null || true
+  if ! docker network inspect "${NETWORK_NAME}" -f '{{range .Containers}}{{println .Name}}{{end}}' | grep -Fxq "${NPM_CONTAINER}"; then
+    docker network connect "${NETWORK_NAME}" "${NPM_CONTAINER}"
+    NPM_CONNECTED=1
+  fi
 else
   echo "未找到 NPM 容器 '${NPM_CONTAINER}'。创建 Proxy Host 前，请先将它接入 Docker 网络 ${NETWORK_NAME}。"
 fi
+
+cat > "${INSTALL_DIR}/.install-state" <<EOF
+DOCKER_NETWORK=${NETWORK_NAME}
+NPM_CONTAINER=${NPM_CONTAINER}
+NETWORK_CREATED=${NETWORK_CREATED}
+NPM_CONNECTED=${NPM_CONNECTED}
+EOF
+chmod 600 "${INSTALL_DIR}/.install-state"
 
 cd "${INSTALL_DIR}"
 docker compose up -d --force-recreate
@@ -135,4 +152,5 @@ Fetch Proxy 已启动。
 预期响应：HTTP 404 和 {"error":"Not found"}
 
 日常管理：以后在任意目录直接输入 fetch，即可打开 Fetch Proxy 管理菜单。
+菜单中可直接同步安装/更新；卸载会删除服务，但会保留 NPM 和 DNS 配置以免影响其他站点。
 EOF

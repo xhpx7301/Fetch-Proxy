@@ -25,7 +25,18 @@ fi
 install -m 644 "${SCRIPT_DIR}/server.mjs" "${INSTALL_DIR}/server.mjs"
 install -m 644 "${SCRIPT_DIR}/docker-compose.yml" "${INSTALL_DIR}/docker-compose.yml"
 install -m 755 "${SCRIPT_DIR}/manage.sh" "${INSTALL_DIR}/manage.sh"
+install -m 755 "${SCRIPT_DIR}/uninstall.sh" "${INSTALL_DIR}/uninstall.sh"
 install -m 755 "${SCRIPT_DIR}/fetch" "/usr/local/bin/fetch"
+
+temp_file="$(mktemp)"
+awk -v source_dir="${SCRIPT_DIR}" -F= '
+  $1 == "SOURCE_DIR" { print "SOURCE_DIR=" source_dir; found = 1; next }
+  { print }
+  END { if (!found) print "SOURCE_DIR=" source_dir }
+' "${INSTALL_DIR}/.env" > "${temp_file}"
+mv "${temp_file}" "${INSTALL_DIR}/.env"
+chmod 600 "${INSTALL_DIR}/.env"
+
 cd "${INSTALL_DIR}"
 docker compose up -d --force-recreate
 echo "更新完成，当前服务日志："

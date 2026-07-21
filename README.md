@@ -134,6 +134,17 @@ sudo bash manage.sh
 fetch
 ```
 
+### 旧版服务升级
+
+如果现有菜单没有“同步 GitHub 并更新服务”“卸载 Fetch Proxy”，或执行 `fetch` 提示找不到命令，先在**实际克隆项目所在目录**执行一次：
+
+```bash
+git pull --ff-only
+sudo bash update.sh
+```
+
+这会安装新的管理菜单、`fetch` 快捷命令和卸载脚本，不会修改现有中转域名、白名单或密钥。之后即可直接使用 `fetch`。
+
 | 菜单项 | 用途 |
 | --- | --- |
 | 服务状态 | 查看容器是否正常运行。 |
@@ -143,6 +154,8 @@ fetch
 | 修改中转域名 | 保存新域名，用于生成提示；NPM 和 DNS 也需要同步调整。 |
 | 显示 MiSub 专属拉取代理 (Fetch Proxy) | 自动生成可直接填入 MiSub 的完整前缀。 |
 | 查看 NPM Proxy Host 与 SSL 配置 | 显示当前域名对应的 NPM 填写内容与验证命令。 |
+| 同步 GitHub 并更新服务 | 自动拉取项目最新代码并更新中转服务，保留现有配置。 |
+| 卸载 Fetch Proxy | 删除中转容器、服务配置和 `fetch` 命令。NPM、SSL、DNS 需手动删除。 |
 
 ## 更新项目
 
@@ -152,6 +165,12 @@ sudo bash deploy.sh
 ```
 
 不要对已有目录重复执行 `git clone`，否则会提示目录已存在。`deploy.sh` 会自动拉取 GitHub 最新代码并更新服务，但不会修改 `/opt/fetch-relay/.env`，因此不会丢失白名单、中转域名或密钥。
+
+## 卸载
+
+管理菜单中的“卸载 Fetch Proxy”需要输入 `UNINSTALL` 才会执行。它会停止并删除中转容器、`/opt/fetch-relay` 服务目录与 `fetch` 命令；如果 Docker 网络和 NPM 网络连接由安装脚本创建，也会在不影响其他容器的前提下清理。
+
+Nginx Proxy Manager 的 Proxy Host、SSL 证书以及 DNS 记录不是脚本创建的，因此不会自动删除。确认不再使用后，请在各自面板手动清理。
 
 ## 更换 VPS
 

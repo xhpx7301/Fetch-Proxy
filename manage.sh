@@ -258,6 +258,29 @@ EOF
   echo "预期：HTTP 404 和 {\"error\":\"Not found\"}"
 }
 
+update_service() {
+  local source_dir
+  source_dir="$(get_env SOURCE_DIR)"
+
+  if [[ -z "${source_dir}" || ! -f "${source_dir}/deploy.sh" ]]; then
+    echo "未找到项目源码目录，无法从菜单自动更新。"
+    echo "请在项目目录执行：sudo bash deploy.sh"
+    return
+  fi
+
+  echo "即将同步 GitHub 并更新服务，现有域名、白名单和密钥会保留。"
+  exec bash "${source_dir}/deploy.sh"
+}
+
+uninstall_service() {
+  if [[ ! -f "${INSTALL_DIR}/uninstall.sh" ]]; then
+    echo "未找到卸载脚本，请先执行一次“同步项目并更新服务”。"
+    return
+  fi
+
+  exec bash "${INSTALL_DIR}/uninstall.sh"
+}
+
 while true; do
   clear || true
   echo "Fetch Proxy 管理菜单"
@@ -270,6 +293,8 @@ while true; do
   echo "5) 修改中转域名"
   echo "6) 显示 MiSub 专属拉取代理 (Fetch Proxy)"
   echo "7) 查看 NPM Proxy Host 与 SSL 配置"
+  echo "8) 同步 GitHub 并更新服务"
+  echo "9) 卸载 Fetch Proxy"
   echo "0) 退出"
   echo
   read -r -p "请选择操作：" choice
@@ -282,6 +307,8 @@ while true; do
     5) change_domain; pause ;;
     6) show_prefix; pause ;;
     7) show_npm_setup; pause ;;
+    8) update_service ;;
+    9) uninstall_service ;;
     0) exit 0 ;;
     *) echo "无效选项。"; pause ;;
   esac
