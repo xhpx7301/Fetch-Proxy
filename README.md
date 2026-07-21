@@ -36,7 +36,18 @@ MiSub -> Fetch Proxy（你的 VPS）-> 机场订阅域名
 - 已运行 Nginx Proxy Manager，容器名默认是 `npm`，并占用 VPS 的 `80/443`。
 - 需要中转的机场订阅域名，例如 `sub.example.com`，不是完整订阅链接。
 
-### 首次部署
+### 一键安装或更新
+
+以后不需要再次执行 `git clone`。在首次安装和后续更新时，都在已有项目目录执行：
+
+```bash
+cd ~/Fetch-Proxy
+sudo bash deploy.sh
+```
+
+它会自动同步 GitHub：首次运行进入安装流程；检测到已部署服务后，仅更新服务代码，保留 `.env` 中的中转域名、白名单和密钥。
+
+### 手动首次部署
 
 ```bash
 git clone https://github.com/xhpx7301/Fetch-Proxy.git
@@ -131,11 +142,10 @@ sudo bash manage.sh
 
 ```bash
 cd Fetch-Proxy
-git pull --ff-only
-sudo bash update.sh
+sudo bash deploy.sh
 ```
 
-更新会覆盖服务代码和 Compose 文件，但不会修改 `/opt/fetch-relay/.env`，因此不会丢失白名单、中转域名或密钥。
+不要对已有目录重复执行 `git clone`，否则会提示目录已存在。`deploy.sh` 会自动拉取 GitHub 最新代码并更新服务，但不会修改 `/opt/fetch-relay/.env`，因此不会丢失白名单、中转域名或密钥。
 
 ## 更换 VPS
 

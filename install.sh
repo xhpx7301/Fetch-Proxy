@@ -16,6 +16,13 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
   exit 1
 fi
 
+if [[ -f "${INSTALL_DIR}/.env" ]]; then
+  echo "检测到已有 Fetch Proxy 安装：${INSTALL_DIR}"
+  echo "请使用 sudo bash deploy.sh 自动同步项目并更新服务。"
+  echo "如需修改白名单、密钥或域名，请使用 sudo bash manage.sh。"
+  exit 0
+fi
+
 echo
 echo "[1/2] 中转域名：必须是你自己拥有、且 DNS 已解析到本服务器的子域名。"
 echo "      例如：fetch.example.com"
