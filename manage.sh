@@ -24,6 +24,32 @@ get_env() {
   sed -n "s/^${key}=//p" "${ENV_FILE}" | tail -n 1
 }
 
+normalize_allowed_hosts() {
+  local raw host normalized=""
+  local relay_domain
+  relay_domain="$(get_env RELAY_DOMAIN)"
+  raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  IFS=',' read -r -a hosts <<< "${raw}"
+
+  if [[ -z "${raw}" || ${#hosts[@]} -eq 0 ]]; then
+    return 1
+  fi
+
+  for host in "${hosts[@]}"; do
+    if [[ ! "${host}" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]]; then
+      echo "白名单域名格式不正确：${host}" >&2
+      return 1
+    fi
+    if [[ -n "${relay_domain}" && ( "${host}" == "${relay_domain}" || "${host}" == *"${relay_domain}"* ) ]]; then
+      echo "机场白名单不能包含中转域名：${relay_domain}" >&2
+      return 1
+    fi
+    normalized+="${normalized:+,}${host}"
+  done
+
+  printf '%s' "${normalized}"
+}
+
 set_env() {
   local key="$1"
   local value="$2"
@@ -73,10 +99,9 @@ change_allowed_hosts() {
   current="$(get_env ALLOWED_HOSTS)"
   echo "当前机场白名单：${current}"
   read -r -p "新的机场域名白名单（多个用英文逗号分隔）：" updated
-  updated="$(printf '%s' "${updated}" | tr -d '[:space:]')"
 
-  if [[ ! "${updated}" =~ ^[A-Za-z0-9.-]+(,[A-Za-z0-9.-]+)*$ ]]; then
-    echo "格式不正确。只填写域名，例如：sub.example.com,api.example.net"
+  if ! updated="$(normalize_allowed_hosts "${updated}")"; then
+    echo "格式不正确。只填写机场域名，例如：sub.example.com,api.example.net"
     return
   fi
 

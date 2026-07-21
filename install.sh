@@ -23,6 +23,30 @@ if [[ -f "${INSTALL_DIR}/.env" ]]; then
   exit 0
 fi
 
+normalize_allowed_hosts() {
+  local raw host normalized=""
+  raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  IFS=',' read -r -a hosts <<< "${raw}"
+
+  if [[ -z "${raw}" || ${#hosts[@]} -eq 0 ]]; then
+    return 1
+  fi
+
+  for host in "${hosts[@]}"; do
+    if [[ ! "${host}" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]]; then
+      echo "白名单域名格式不正确：${host}" >&2
+      return 1
+    fi
+    if [[ "${host}" == "${RELAY_DOMAIN}" || "${host}" == *"${RELAY_DOMAIN}"* ]]; then
+      echo "机场白名单不能包含中转域名：${RELAY_DOMAIN}" >&2
+      return 1
+    fi
+    normalized+="${normalized:+,}${host}"
+  done
+
+  printf '%s' "${normalized}"
+}
+
 echo
 echo "[1/2] 中转域名：必须是你自己拥有、且 DNS 已解析到本服务器的子域名。"
 echo "      例如：fetch.example.com"
@@ -32,15 +56,18 @@ while [[ -z "${RELAY_DOMAIN}" || "${RELAY_DOMAIN}" == *"/"* || "${RELAY_DOMAIN}"
   echo "格式不正确：只填写域名，例如 fetch.example.com。"
   read -r -p "请输入中转域名：" RELAY_DOMAIN
 done
+RELAY_DOMAIN="$(printf '%s' "${RELAY_DOMAIN}" | tr '[:upper:]' '[:lower:]')"
 
 echo
 echo "[2/2] 机场域名白名单：填写需要通过本服务器拉取的机场订阅域名。"
 echo "      例如：sub.example.com,api.example.net"
 echo "      只填写域名；不要填写完整订阅链接、Token、https:// 或路径。"
-read -r -p "请输入机场域名白名单（多个用英文逗号分隔）：" ALLOWED_HOSTS
-while [[ -z "${ALLOWED_HOSTS}" ]]; do
-  echo "至少需要填写一个机场域名。"
-  read -r -p "请输入机场域名白名单：" ALLOWED_HOSTS
+while true; do
+  read -r -p "请输入机场域名白名单（多个用英文逗号分隔）：" ALLOWED_HOSTS_INPUT
+  if ALLOWED_HOSTS="$(normalize_allowed_hosts "${ALLOWED_HOSTS_INPUT}")"; then
+    break
+  fi
+  echo "请重新填写有效的机场域名白名单。"
 done
 
 echo
@@ -59,6 +86,8 @@ echo "已生成新的中转密钥，请勿截图、分享或提交到 GitHub。"
 install -d -m 700 "${INSTALL_DIR}"
 install -m 644 "${SCRIPT_DIR}/server.mjs" "${INSTALL_DIR}/server.mjs"
 install -m 644 "${SCRIPT_DIR}/docker-compose.yml" "${INSTALL_DIR}/docker-compose.yml"
+install -m 755 "${SCRIPT_DIR}/manage.sh" "${INSTALL_DIR}/manage.sh"
+install -m 755 "${SCRIPT_DIR}/fetch" "/usr/local/bin/fetch"
 
 cat > "${INSTALL_DIR}/.env" <<EOF
 ALLOWED_HOSTS=${ALLOWED_HOSTS}
@@ -104,4 +133,6 @@ Fetch Proxy 已启动。
 
 验证命令：curl -i https://${RELAY_DOMAIN}/
 预期响应：HTTP 404 和 {"error":"Not found"}
+
+日常管理：以后在任意目录直接输入 fetch，即可打开 Fetch Proxy 管理菜单。
 EOF

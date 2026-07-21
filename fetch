@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MANAGE_SCRIPT="/opt/fetch-relay/manage.sh"
+
+if [[ ! -f "${MANAGE_SCRIPT}" ]]; then
+  echo "未找到 Fetch Proxy 管理脚本：${MANAGE_SCRIPT}"
+  echo "请先运行 deploy.sh 完成安装。"
+  exit 1
+fi
+
+if [[ "${EUID}" -eq 0 ]]; then
+  exec bash "${MANAGE_SCRIPT}" "$@"
+fi
+
+exec sudo bash "${MANAGE_SCRIPT}" "$@"
+

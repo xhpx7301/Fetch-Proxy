@@ -24,6 +24,8 @@ fi
 
 install -m 644 "${SCRIPT_DIR}/server.mjs" "${INSTALL_DIR}/server.mjs"
 install -m 644 "${SCRIPT_DIR}/docker-compose.yml" "${INSTALL_DIR}/docker-compose.yml"
+install -m 755 "${SCRIPT_DIR}/manage.sh" "${INSTALL_DIR}/manage.sh"
+install -m 755 "${SCRIPT_DIR}/fetch" "/usr/local/bin/fetch"
 cd "${INSTALL_DIR}"
 docker compose up -d --force-recreate
 echo "更新完成，当前服务日志："
