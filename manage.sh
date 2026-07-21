@@ -27,6 +27,7 @@ get_env() {
 normalize_allowed_hosts() {
   local raw host normalized=""
   local relay_domain
+  local -A seen=()
   relay_domain="$(get_env RELAY_DOMAIN)"
   raw="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
   IFS=',' read -r -a hosts <<< "${raw}"
@@ -44,6 +45,10 @@ normalize_allowed_hosts() {
       echo "机场白名单不能包含中转域名：${relay_domain}" >&2
       return 1
     fi
+    if [[ -n "${seen[${host}]:-}" ]]; then
+      continue
+    fi
+    seen["${host}"]=1
     normalized+="${normalized:+,}${host}"
   done
 
@@ -94,20 +99,101 @@ show_prefix() {
   echo "此地址包含密钥，请勿截图、分享或发送到聊天记录。"
 }
 
-change_allowed_hosts() {
-  local current updated
+show_allowed_hosts() {
+  local current host index=1
   current="$(get_env ALLOWED_HOSTS)"
-  echo "当前机场白名单：${current}"
-  read -r -p "新的机场域名白名单（多个用英文逗号分隔）：" updated
+  echo "当前机场域名白名单："
+  IFS=',' read -r -a hosts <<< "${current}"
+  for host in "${hosts[@]}"; do
+    [[ -n "${host}" ]] || continue
+    echo "  ${index}) ${host}"
+    ((index += 1))
+  done
+}
+
+save_allowed_hosts() {
+  set_env ALLOWED_HOSTS "$1"
+  restart_relay
+  echo "机场白名单已更新，中转服务已重启。"
+}
+
+add_allowed_host() {
+  local current added updated
+  current="$(get_env ALLOWED_HOSTS)"
+  read -r -p "新增机场域名（只填一个域名）：" added
+
+  if ! updated="$(normalize_allowed_hosts "${current},${added}")"; then
+    echo "格式不正确。只填写机场域名，例如：sub.example.com"
+    return
+  fi
+
+  save_allowed_hosts "${updated}"
+}
+
+remove_allowed_host() {
+  local current target host updated="" found=false
+  current="$(get_env ALLOWED_HOSTS)"
+  read -r -p "删除机场域名（必须与列表完全一致）：" target
+  target="$(printf '%s' "${target}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+
+  IFS=',' read -r -a hosts <<< "${current}"
+  for host in "${hosts[@]}"; do
+    if [[ "${host}" == "${target}" ]]; then
+      found=true
+      continue
+    fi
+    updated+="${updated:+,}${host}"
+  done
+
+  if [[ "${found}" != true ]]; then
+    echo "白名单中未找到：${target}"
+    return
+  fi
+  if [[ -z "${updated}" ]]; then
+    echo "至少需要保留一个机场域名，不能删除最后一项。"
+    return
+  fi
+
+  if ! updated="$(normalize_allowed_hosts "${updated}")"; then
+    echo "剩余白名单格式异常，请使用“替换全部白名单”修复。"
+    return
+  fi
+
+  save_allowed_hosts "${updated}"
+}
+
+replace_allowed_hosts() {
+  local updated
+  read -r -p "新的完整白名单（多个域名用英文逗号分隔）：" updated
 
   if ! updated="$(normalize_allowed_hosts "${updated}")"; then
     echo "格式不正确。只填写机场域名，例如：sub.example.com,api.example.net"
     return
   fi
 
-  set_env ALLOWED_HOSTS "${updated}"
-  restart_relay
-  echo "机场白名单已更新，中转服务已重启。"
+  save_allowed_hosts "${updated}"
+}
+
+manage_allowed_hosts() {
+  local choice
+  while true; do
+    echo
+    show_allowed_hosts
+    echo
+    echo "1) 新增机场域名"
+    echo "2) 删除机场域名"
+    echo "3) 替换全部白名单"
+    echo "0) 返回上级菜单"
+    read -r -p "请选择操作：" choice
+
+    case "${choice}" in
+      1) add_allowed_host; pause ;;
+      2) remove_allowed_host; pause ;;
+      3) replace_allowed_hosts; pause ;;
+      0) return ;;
+      *) echo "无效选项。"; pause ;;
+    esac
+  done
 }
 
 rotate_secret() {
@@ -179,7 +265,7 @@ while true; do
   echo
   echo "1) 查看服务状态"
   echo "2) 查看最近日志"
-  echo "3) 修改机场域名白名单"
+  echo "3) 管理机场域名白名单"
   echo "4) 轮换中转密钥"
   echo "5) 修改中转域名"
   echo "6) 显示 MiSub 专属拉取代理 (Fetch Proxy)"
@@ -191,7 +277,7 @@ while true; do
   case "${choice}" in
     1) compose ps; pause ;;
     2) compose logs --tail=80 fetch-relay; pause ;;
-    3) change_allowed_hosts; pause ;;
+    3) manage_allowed_hosts ;;
     4) rotate_secret; pause ;;
     5) change_domain; pause ;;
     6) show_prefix; pause ;;
