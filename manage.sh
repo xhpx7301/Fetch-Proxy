@@ -5,17 +5,17 @@ INSTALL_DIR="${INSTALL_DIR:-/opt/fetch-relay}"
 ENV_FILE="${INSTALL_DIR}/.env"
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Please run as root: sudo bash manage.sh"
+  echo "请使用 root 权限运行：sudo bash manage.sh"
   exit 1
 fi
 
 if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
-  echo "Docker Engine and Docker Compose plugin are required."
+  echo "需要 Docker Engine 和 Docker Compose Plugin。"
   exit 1
 fi
 
 if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "No installation found at ${INSTALL_DIR}. Run install.sh first."
+  echo "未在 ${INSTALL_DIR} 找到已有安装，请先运行 install.sh。"
   exit 1
 fi
 
@@ -48,7 +48,7 @@ restart_relay() {
 
 pause() {
   echo
-  read -r -p "Press Enter to return to the menu..." _
+  read -r -p "按 Enter 返回菜单..." _
 }
 
 show_prefix() {
@@ -57,62 +57,62 @@ show_prefix() {
   secret="$(get_env RELAY_SECRET)"
 
   if [[ -z "${domain}" || -z "${secret}" ]]; then
-    echo "RELAY_DOMAIN or RELAY_SECRET is missing from ${ENV_FILE}."
+    echo "${ENV_FILE} 缺少 RELAY_DOMAIN 或 RELAY_SECRET。"
     return
   fi
 
   echo
-  echo "MiSub 专属拉取代理 (Fetch Proxy):"
+  echo "MiSub 专属拉取代理 (Fetch Proxy)："
   echo "https://${domain}/api/${secret}?url="
   echo
-  echo "Treat this as a secret. Do not post it in screenshots or chat messages."
+  echo "此地址包含密钥，请勿截图、分享或发送到聊天记录。"
 }
 
 change_allowed_hosts() {
   local current updated
   current="$(get_env ALLOWED_HOSTS)"
-  echo "Current allowed hosts: ${current}"
-  read -r -p "New hosts (comma separated hostnames): " updated
+  echo "当前机场白名单：${current}"
+  read -r -p "新的机场域名白名单（多个用英文逗号分隔）：" updated
   updated="$(printf '%s' "${updated}" | tr -d '[:space:]')"
 
   if [[ ! "${updated}" =~ ^[A-Za-z0-9.-]+(,[A-Za-z0-9.-]+)*$ ]]; then
-    echo "Invalid host list. Enter hostnames only, for example: sub.example.com,api.example.net"
+    echo "格式不正确。只填写域名，例如：sub.example.com,api.example.net"
     return
   fi
 
   set_env ALLOWED_HOSTS "${updated}"
   restart_relay
-  echo "Allowed hosts updated and relay restarted."
+  echo "机场白名单已更新，中转服务已重启。"
 }
 
 rotate_secret() {
   local confirm new_secret
-  read -r -p "Rotate the relay secret? Existing MiSub proxy prefixes will stop working. [y/N]: " confirm
+  read -r -p "确认轮换中转密钥？现有 MiSub 代理地址将立即失效。[y/N]：" confirm
   if [[ "${confirm}" != "y" && "${confirm}" != "Y" ]]; then
-    echo "Cancelled."
+    echo "已取消。"
     return
   fi
 
   new_secret="$(openssl rand -hex 32)"
   set_env RELAY_SECRET "${new_secret}"
   restart_relay
-  echo "Relay secret rotated. Update every affected MiSub subscription now."
+  echo "中转密钥已轮换，请立即更新所有使用此中转的 MiSub 订阅。"
   show_prefix
 }
 
 change_domain() {
   local current updated
   current="$(get_env RELAY_DOMAIN)"
-  echo "Current relay domain: ${current}"
-  read -r -p "New relay domain (hostname only): " updated
+  echo "当前中转域名：${current}"
+  read -r -p "新的中转域名（只填域名）：" updated
 
   if [[ ! "${updated}" =~ ^[A-Za-z0-9.-]+$ ]]; then
-    echo "Invalid hostname."
+    echo "域名格式不正确。"
     return
   fi
 
   set_env RELAY_DOMAIN "${updated}"
-  echo "Saved. Also create or update the matching Nginx Proxy Manager host and SSL certificate."
+  echo "已保存。请同时在 Nginx Proxy Manager 中创建或更新对应的 Proxy Host 和 SSL 证书。"
   show_prefix
 }
 
@@ -122,18 +122,18 @@ show_npm_setup() {
   network="$(get_env DOCKER_NETWORK)"
 
   if [[ -z "${domain}" ]]; then
-    echo "RELAY_DOMAIN is missing from ${ENV_FILE}."
+    echo "${ENV_FILE} 缺少 RELAY_DOMAIN。"
     return
   fi
 
   echo
-  echo "Nginx Proxy Manager Proxy Host"
-  echo "  Domain Names:               ${domain}"
-  echo "  Scheme:                     http"
-  echo "  Forward Hostname / IP:      fetch-relay"
-  echo "  Forward Port:               3210"
+  echo "Nginx Proxy Manager Proxy Host 配置"
+  echo "  Domain Names：              ${domain}"
+  echo "  Scheme：                    http"
+  echo "  Forward Hostname / IP：     fetch-relay"
+  echo "  Forward Port：              3210"
   echo
-  echo "Advanced configuration:"
+  echo "Advanced 配置："
   cat <<'EOF'
 access_log off;
 proxy_buffering off;
@@ -141,27 +141,27 @@ resolver 127.0.0.11 valid=30s ipv6=off;
 resolver_timeout 5s;
 EOF
   echo
-  echo "SSL tab: request a certificate for ${domain}, then enable Force SSL."
-  echo "Ensure the NPM container is connected to Docker network: ${network:-fetch-relay-net}"
-  echo "After saving, test: curl -i https://${domain}/"
-  echo "Expected: HTTP 404 and {\"error\":\"Not found\"}"
+  echo "SSL 标签页：为 ${domain} 申请证书，然后启用 Force SSL。"
+  echo "确认 NPM 容器已接入 Docker 网络：${network:-fetch-relay-net}"
+  echo "保存后验证：curl -i https://${domain}/"
+  echo "预期：HTTP 404 和 {\"error\":\"Not found\"}"
 }
 
 while true; do
   clear || true
-  echo "Fetch Proxy management"
-  echo "Installation: ${INSTALL_DIR}"
+  echo "Fetch Proxy 管理菜单"
+  echo "安装目录：${INSTALL_DIR}"
   echo
-  echo "1) Service status"
-  echo "2) Recent logs"
-  echo "3) Change allowed subscription hosts"
-  echo "4) Rotate relay secret"
-  echo "5) Change relay domain"
+  echo "1) 查看服务状态"
+  echo "2) 查看最近日志"
+  echo "3) 修改机场域名白名单"
+  echo "4) 轮换中转密钥"
+  echo "5) 修改中转域名"
   echo "6) 显示 MiSub 专属拉取代理 (Fetch Proxy)"
   echo "7) 查看 NPM Proxy Host 与 SSL 配置"
-  echo "0) Exit"
+  echo "0) 退出"
   echo
-  read -r -p "Choose an option: " choice
+  read -r -p "请选择操作：" choice
 
   case "${choice}" in
     1) compose ps; pause ;;
@@ -172,6 +172,6 @@ while true; do
     6) show_prefix; pause ;;
     7) show_npm_setup; pause ;;
     0) exit 0 ;;
-    *) echo "Unknown option."; pause ;;
+    *) echo "无效选项。"; pause ;;
   esac
 done
